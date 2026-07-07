@@ -26,6 +26,7 @@
 """
 
 import io
+import os
 from datetime import datetime
 
 import matplotlib
@@ -247,18 +248,41 @@ def auto_label_segments(df: pd.DataFrame, cluster_col="cluster") -> dict:
 st.sidebar.title("🏙️ Parcl Buyer Intelligence")
 st.sidebar.caption("Machine-learning buyer segmentation & investment profiling")
 
-with st.sidebar.expander("📁 Data Source", expanded=False):
-    use_uploaded = st.checkbox("Upload my own files", value=False)
+# Bundled default data lives in a "data" folder next to this script. Using an
+# absolute path (anchored to this file, not the shell's current directory)
+# means the app auto-loads correctly no matter where `streamlit run` is
+# launched from.
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CLIENTS_PATH = os.path.join(APP_DIR, "data", "clients.csv")
+DEFAULT_PROPERTIES_PATH = os.path.join(APP_DIR, "data", "properties.csv")
+
+
+def _read_bytes(path):
+    with open(path, "rb") as f:
+        return f.read()
+
+
+clients_bytes, properties_bytes = None, None
+default_data_found = os.path.exists(DEFAULT_CLIENTS_PATH) and os.path.exists(DEFAULT_PROPERTIES_PATH)
+
+if default_data_found:
+    clients_bytes = _read_bytes(DEFAULT_CLIENTS_PATH)
+    properties_bytes = _read_bytes(DEFAULT_PROPERTIES_PATH)
+
+with st.sidebar.expander("📁 Data Source", expanded=not default_data_found):
+    if default_data_found:
+        st.success("Using bundled dataset (data/clients.csv + data/properties.csv).")
+    else:
+        st.warning("Bundled dataset not found next to app.py — please upload both files.")
+
+    use_uploaded = st.checkbox("Use my own files instead", value=not default_data_found)
     if use_uploaded:
         up_clients = st.file_uploader("clients.csv", type="csv")
         up_props = st.file_uploader("properties.csv", type="csv")
-        clients_bytes = up_clients.getvalue() if up_clients else None
-        properties_bytes = up_props.getvalue() if up_props else None
-    else:
-        with open("data/clients.csv", "rb") as f:
-            clients_bytes = f.read()
-        with open("data/properties.csv", "rb") as f:
-            properties_bytes = f.read()
+        if up_clients is not None:
+            clients_bytes = up_clients.getvalue()
+        if up_props is not None:
+            properties_bytes = up_props.getvalue()
 
 if not clients_bytes or not properties_bytes:
     st.info("Upload both `clients.csv` and `properties.csv` in the sidebar to continue.")
